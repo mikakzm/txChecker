@@ -12,5 +12,6 @@ def error_handling_wrapper(controller):
                 status = 400,
                 mimetype='application/json'
             )
+    wrapped_controller.__name__ = controller.__name__
     
     return wrapped_controller
