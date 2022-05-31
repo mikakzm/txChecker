@@ -5,6 +5,7 @@ import redis
 import requests
 import json
 import controllers
+import middlewares
 
 config = ConfigParser()
 config.read('config.cfg')
@@ -12,12 +13,18 @@ config.read('config.cfg')
 r = redis.StrictRedis(host='127.0.0.1', port=6379, charset="utf-8", decode_responses=True)
 
 routes = [
-    (['POST'], '/TRC20/<coin>', controllers.trc20),
-    (['POST'], '/ERC20/<coin>', controllers.erc20),
+    (['POST'], '/TRC20/<coin>', controllers.trc20, [
+        middlewares.error_handling_wrapper
+    ]),
+    (['POST'], '/ERC20/<coin>', controllers.erc20, [
+
+    ]),
 ]
 
 app = Flask(__name__)
 
 for route_configs in routes:
-    methods, path, controller = route_configs
+    methods, path, controller, middlewares_to_apply = route_configs
+    for mw in middlewares_to_apply:
+        controller = mw(controller)
     app.add_url_rule(rule=path, view_func=controller, methods=methods)

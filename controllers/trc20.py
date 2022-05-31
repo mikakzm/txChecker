@@ -1,7 +1,5 @@
-from operator import ne
-from flask import Flask, request, jsonify, Response
+from flask import request, Response
 from configparser import ConfigParser
-import redis
 import requests
 import json
 
@@ -12,47 +10,40 @@ def trc20(coin):
     to, value, txid = request.json['to'], request.json['value'], request.json['txid']
     url = config['TRC20']['url'] + txid
     r = requests.get(url)
-    if r.status_code != 200 :
+
+    def failed_transaction(status, info):
         return Response(
-            json.dumps({'tx_status': "UNREACHABLE",'info': 'transaction is reverted by the evm'}),
+            json.dumps({'tx_status': status,'info': info}),
             status = 200,
             mimetype='application/json'
         )
 
+    def satisfied_transaction(status):
+        return Response(
+            json.dumps({'tx_status': status}),
+            status = 200,
+            mimetype='application/json'
+        )
+
+    if r.status_code != 200 :
+        return failed_transaction('UNREACHABLE', "can't connect to blockchain")
+        
     content = json.loads(r._content)
+    decimal = config['DECIMAL']['TRC20_' + coin]
 
     if content['revert'] != False or content['contractRet'] != "SUCCESS":
-        return Response(
-            json.dumps({'tx_status': "NOT_PAID",'info': 'transaction is reverted by the evm'}),
-            status = 200,
-            mimetype='application/json'
-        )
+        return failed_transaction('NOT_PAID', 'transaction is reverted by the blockchain')
+
     trigget_info  = content['trigger_info']
 
     if trigget_info['contract_address'] != config['TRC20'][coin]:
-        return Response(
-            json.dumps({'tx_status': "NOT_PAID",'info': 'token does not match'}),
-            status = 200,
-            mimetype='application/json'
-        )
+        return failed_transaction('NOT_PAID', 'token does not match')
     
     if trigget_info['parameter']['_to'] != to: 
-        return Response(
-            json.dumps({'tx_status': "NOT_PAID",'info': 'wallet does not match'}),
-            status = 200,
-            mimetype='application/json'
-        )
+        return failed_transaction('NOT_PAID', 'wallet does not match')
 
-    if trigget_info['parameter']['_value'] != value: 
-        return Response(
-            json.dumps({'tx_status': "NOT_PAID",'info': 'value does not match'}),
-            status = 200,
-            mimetype='application/json'
-        )
+    if float(trigget_info['parameter']['_value']) != float(value) * (10 ** int(decimal)): 
+         return failed_transaction('NOT_PAID', 'value does not match')
 
-    return Response(
-        json.dumps({'tx_status': 'PAID'}),
-        status = 200,
-        mimetype='application/json'
-    )
+    return satisfied_transaction('PAID')
 
