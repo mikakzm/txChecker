@@ -1,23 +1,17 @@
-from operator import ne
-from flask import Flask, request, jsonify, Response
+from flask import Flask
 from configparser import ConfigParser
-import redis
-import requests
-import json
 import controllers
 import middlewares
 
 config = ConfigParser()
 config.read('config.cfg')
 
-r = redis.StrictRedis(host='127.0.0.1', port=6379, charset="utf-8", decode_responses=True)
-
 routes = [
     (['POST'], '/TRC20/<coin>', controllers.trc20, [
         middlewares.error_handling_wrapper
     ]),
     (['POST'], '/ERC20/<coin>', controllers.erc20, [
-
+        middlewares.error_handling_wrapper
     ]),
 ]
 
